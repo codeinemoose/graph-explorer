@@ -101,6 +101,10 @@
     "typeinfo": "cpp",
     "unordered_set": "cpp",
     "fstream": "cpp",
-    "istream": "cpp"
+    "istream": "cpp",
+    "map": "cpp",
+    "iostream": "cpp",
+    "sstream": "cpp",
+    "bitset": "cpp"
   }
 }
