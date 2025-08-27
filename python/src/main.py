@@ -21,8 +21,6 @@ def main(argv: list[str]) -> int:
     print("offsets:", offsets)
     print("targets:", targets)
 
-    print("LOADING GRAPH")
-
     return 1
 
 if __name__ == "__main__":

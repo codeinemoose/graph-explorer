@@ -105,6 +105,7 @@
     "map": "cpp",
     "iostream": "cpp",
     "sstream": "cpp",
-    "bitset": "cpp"
+    "bitset": "cpp",
+    "ctime": "cpp"
   }
 }

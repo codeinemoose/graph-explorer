@@ -33,24 +33,15 @@ Graph* txt_to_graph(std::string dir){
     
     vertex_nr++;
     
-    std::cout << "degrees: ";
     std::vector<node_int> degrees(vertex_nr, 0);
     for(auto &e : edges){
         degrees[e.first]++;
     }
-    for(node_int i = 0; i < vertex_nr; i++){
-        std::cout << degrees[i] << ", ";
-    }
-    std::cout << std::endl;
 
-    std::cout << "offsets: ";
     std::vector<node_int> offsets(vertex_nr + 1, 0);
     for(node_int i = 0; i < vertex_nr; i++){
         offsets[i + 1] = offsets[i] + degrees[i];
-
-        std::cout << offsets[i] << ", ";
     }
-    std::cout << std::endl;
 
     std::vector<node_int> writepos(vertex_nr, 0);
     std::vector<node_int> targets(offsets[vertex_nr]);
@@ -61,12 +52,6 @@ Graph* txt_to_graph(std::string dir){
         
         writepos[idA]++;
     }
-
-    std::cout << "targets: ";
-    for(unsigned long long i = 0; i < edges.size(); i++){
-        std::cout << targets[i] << ", ";
-    }
-    std::cout << std::endl;
 
     std::vector<node_int> communities(vertex_nr);
     for(node_int i = 0; i < vertex_nr; i++){
@@ -165,9 +150,10 @@ Graph* preproc(std::string dir, bool communities){
         communities_to_bin(dir, graph, 0);
         for(uint64_t iteration = 1; iteration < config::MAX_PROP_ITER; iteration++){
             label_prop(graph);
-            communities_to_bin(dir, graph, iteration);            
+            //communities_to_bin(dir, graph, iteration);            
         }
     }
+    communities_to_bin(dir, graph, 0);
 
     graph_to_bin(dir, graph);
 

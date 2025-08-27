@@ -24,13 +24,6 @@ class FDL{
         double temp;
 };
 
-namespace fdl{
-    constexpr int FDL_MAX_ITER = 5;
-    constexpr int WIDTH = 1024;
-    constexpr int HEIGHT = 1024;
-    constexpr double FDL_START_TEMP = 1;
-}
-
 void fdl_run(std::string file_name, Graph* graph);
 
 #endif
