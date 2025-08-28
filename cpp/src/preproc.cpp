@@ -8,6 +8,7 @@
 #include <sstream>
 #include <iostream>
 #include <cstdint>
+#include <filesystem>
 
 Graph* txt_to_graph(std::string dir){
     std::ifstream in_file(dir);
@@ -73,6 +74,7 @@ Graph* txt_to_graph(std::string dir){
  *      [[Offsets]-[Targets]] <- Payload
  */
 int graph_to_bin(std::string file_name, Graph* graph){
+
     std::ofstream file;
     file.open(file_name.substr(0, file_name.size() - 4)+ "-graph.bin", std::ios::binary);
     std::cout << "opened: " << file_name << std::endl;

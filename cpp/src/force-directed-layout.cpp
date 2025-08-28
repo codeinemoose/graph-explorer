@@ -198,18 +198,35 @@ void fdl_to_json(std::string file_name, Graph* graph, FDL* fdl) {
         return;
     }
 
+    std::vector<node_int> ranking;
+    if(fdl::INCLUDE_RANK_JSON){
+        ranking = rank_graph(graph, (ranking_algorithm)config::RANKING_ALGORITHM);
+    }
+
     out << "{\n";
 
     // write nodes
     out << "  \"nodes\": [\n";
     for (node_int v = 0; v < graph->get_vertex_nr(); v++) {
         // don't show if it's an isolated node
-        if(graph->get_adj_matrix()[v].empty()) continue;
+        if(graph->get_adj_matrix()[v].empty() && !fdl::SHOW_ISOLATED_NODES_JSON){
+            continue;
+        }
 
         out << "    {\"id\": " << v
             << ", \"x\": " << fdl->pos[v].first
             << ", \"y\": " << fdl->pos[v].second
-            << ", \"label\": \"" << graph->get_communities()[v] << "\"}";
+            << ", \"label\": \"" << graph->get_communities()[v] << "\"";
+
+        if(fdl::INCLUDE_NEIGHBOURS_JSON){
+            node_int neighbour_number = graph->get_adj_matrix()[v].size();
+            out << ", \"neighbours\": " << neighbour_number;
+        }
+        if(fdl::INCLUDE_RANK_JSON){
+            out << ", \"rank\": " << ranking[v];
+        }
+
+        out << "}";
         if (v < graph->get_vertex_nr() - 1) out << ",";
         out << "\n";
     }
@@ -229,8 +246,8 @@ void fdl_to_json(std::string file_name, Graph* graph, FDL* fdl) {
         }
     }
     out << "  ]\n";
-
     out << "}\n";
+
     out.close();
 
     DEBUG_PRINT("Created JSON: " + out_name);

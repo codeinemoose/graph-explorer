@@ -13,11 +13,19 @@ G = nx.Graph()
 
 # Add nodes with positions and the label attribute from JSON
 pos = {}
+ranks = {}
 for node in data["nodes"]:
     node_id = node["id"]
     node_label = node.get("label", "")   # use JSON label (fallback to "")
     G.add_node(node_id, label=node_label)
     pos[node_id] = (node["x"], node["y"])
+    ranks[node_id] = node["neighbours"]
+
+# Change the size of each node according to the number of neighbours
+sizes = {n: ranks[n] for n in ranks}
+max_size = max(sizes.values())
+sizes = {n: (sizes[n] + 1) / max_size for n in sizes}
+node_sizes = [sizes[n] * 100 for n in G.nodes()]
 
 # Add edges
 for edge in data["edges"]:
@@ -47,7 +55,7 @@ nx.draw(
     with_labels=False,
     labels={n: G.nodes[n]["label"] for n in G.nodes()},
     node_color=node_colors,
-    node_size=20,
+    node_size=node_sizes,
     font_color="white",
     edge_color="#dddddd",  # very light grey edges
     linewidths=0.1

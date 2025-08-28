@@ -4,6 +4,7 @@
 #include <string>
 #include "graph.h"
 #include "config.h"
+#include "ranking.h"
 
 class FDL{
     public:

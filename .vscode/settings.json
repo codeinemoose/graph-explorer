@@ -106,6 +106,9 @@
     "iostream": "cpp",
     "sstream": "cpp",
     "bitset": "cpp",
-    "ctime": "cpp"
+    "ctime": "cpp",
+    "codecvt": "cpp",
+    "ratio": "cpp",
+    "iomanip": "cpp"
   }
 }
