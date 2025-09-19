@@ -17,6 +17,8 @@ namespace config{
      * go through more than one iteration. (e.g. NEIGHBOURHOOD is not affected)
      */
     constexpr int RANKING_ITERATIONS = 10;
+
+    constexpr int MAX_QUADTREE_DEPTH = 64;
 }
 
 namespace fdl{

@@ -59,9 +59,6 @@ Graph* txt_to_graph(std::string dir){
         communities[i] = i;
     }
 
-    std::cout << "offsets[vertex_nr] (edges): " << offsets[vertex_nr] << std::endl;
-    std::cout << "vertex_nr: " << vertex_nr << std::endl;
-
     Graph* graph = new Graph(offsets[vertex_nr], vertex_nr, offsets, targets, degrees, communities);
 
     return graph;
@@ -77,7 +74,6 @@ int graph_to_bin(std::string file_name, Graph* graph){
 
     std::ofstream file;
     file.open(file_name.substr(0, file_name.size() - 4)+ "-graph.bin", std::ios::binary);
-    std::cout << "opened: " << file_name << std::endl;
 
     uint8_t type_block = 0x00;
     uint8_t version_block = 0x00;
@@ -113,7 +109,6 @@ int graph_to_bin(std::string file_name, Graph* graph){
     file.write(data, file_size);
 
     file.close();
-    std::cout << "closed: " << file_name << std::endl;
     delete[] data;
     return 1;
 }

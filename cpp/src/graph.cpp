@@ -1,7 +1,9 @@
 #include <vector>
 #include "graph.h"
 
-
+graph_type Graph::get_graph_type(){
+    return this->graph_type;
+}
 
 node_int Graph::get_vertex_nr(){
     return this->vertex_nr;

@@ -2,6 +2,15 @@
 #define FORCE_DIRECTED_LAYOUT_H
 
 #include <string>
+#include <math.h>
+#include <fstream>
+#include <vector>
+#include <cstdlib>
+#include <iostream>
+#include <algorithm>
+#include <random>
+#include <ctime>
+#include <limits>
 #include "graph.h"
 #include "config.h"
 #include "ranking.h"

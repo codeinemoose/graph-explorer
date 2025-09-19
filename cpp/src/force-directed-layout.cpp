@@ -5,14 +5,13 @@
 #include "force-directed-layout.h"
 #include "main.h"
 #include "config.h"
-#include <math.h>
-#include <fstream>
-#include <vector>
-#include <cstdlib>
-#include <iostream>
-#include <algorithm>
-#include <random>
-#include <ctime>
+
+/**
+ * @brief Implements the Quadtree used for improving the runtime of the FDL algorithm.
+ */
+class QTree{
+    
+};
 
 /**
  * @brief Repulsive force
@@ -27,15 +26,6 @@ double f_att(double x, double k){
 double f_rep(double x, double k){
     return (k*k)/x;
 }
-
-/**
- * @brief Calculates the Euclidean distance between two points.
- */
-/*
-double length(double a, double b){
-    return std::abs(a - b);
-}
-*/
 
 double cool(double temp, int iteration){
     return fdl::FDL_START_TEMP * (1.0 - (double)iteration / (double)fdl::FDL_MAX_ITER);
@@ -95,7 +85,13 @@ void fdl_iteration(FDL *fdl, Graph* graph, int iteration){
                 if (d < EPS) continue;
             }
 
-            double force = f_att(d, fdl->k) / 2.0; // undirected edges counted twice
+            double force;
+            if(graph->get_graph_type() == UNDIRECTED) {
+                force = f_att(d, fdl->k) / 2.0; // undirected edges counted twice
+            }
+            else{
+                force = f_att(d, fdl->k);
+            }
             double ux = dx / d;
             double uy = dy / d;
 
@@ -262,12 +258,13 @@ void fdl_run(std::string file_name, Graph* graph){
     FDL *fdl = fdl_start(graph);
 
     fdl_to_json(file_name.substr(0, file_name.size() - 4) + std::to_string(0) + file_name.substr(file_name.size() - 4, file_name.size()), graph, fdl);
-    fdl_iteration(fdl, graph, 0);
-    for(int iteration = 1; iteration < fdl::FDL_MAX_ITER; iteration++){
-        DEBUG_PRINT("FDL iteration: " + std::to_string(iteration));
+    for(int iteration = 1; iteration <= fdl::FDL_MAX_ITER; iteration++){
+        //DEBUG_PRINT("FDL iteration: " + std::to_string(iteration));
+        print_progress_bar((double)iteration / fdl::FDL_MAX_ITER);
         fdl_iteration(fdl, graph, iteration);
         //fdl_to_json(file_name.substr(0, file_name.size() - 4) + std::to_string(iteration) + file_name.substr(file_name.size() - 4, file_name.size()), graph, fdl);
     }
+    std::cout << std::endl;
     fdl_to_json(file_name.substr(0, file_name.size() - 4) + std::to_string(1) + file_name.substr(file_name.size() - 4, file_name.size()), graph, fdl);
 
 
@@ -275,3 +272,129 @@ void fdl_run(std::string file_name, Graph* graph){
 
     return;
 }
+
+class quadtree{
+    static constexpr int infty = std::numeric_limits<int>::infinity();
+    static constexpr node_int nil = node_int(-1);
+    
+    // We store the points as integer x,y coordinates. This also means, that the canvas should ideally be a multiple of 2.
+    struct point{
+        int x,y;
+    };
+    
+    // The bounding box of a node.
+    struct aabb{
+        point min{infty, infty};
+        point max{-infty, -infty};
+        
+        aabb& operator |= (const point& p){
+            min.x = std::min(min.x, p.x);
+            min.y = std::min(min.y, p.y);
+            max.x = std::max(max.x, p.x);
+            max.y = std::max(max.y, p.y);
+            
+            return *this;
+        }
+    };
+    
+    point middle(const point a, const point b){
+        return {(a.x + b.x) / 2, (a.y + b.y) / 2};
+    }
+    
+    template<typename T>aabb bound(T begin, T end){
+        aabb return_me;
+        for(auto e = begin; e != end; e++){
+            return_me |= *e;
+        }
+
+        return return_me;
+    }
+
+    struct node{
+        node_int children[2][2]{
+            {nil, nil},
+            {nil, nil}
+        };
+    };
+
+    struct qtree{
+        aabb bound;
+        node_int root;
+        std::vector<node> nodes;
+        std::vector<float> mass;
+        std::vector<point> center_of_mass;
+
+        std::vector<point> points;
+        /**
+         * Stores the per-node data. Here the points for 'id + 1' are stored directly after
+         * the points for 'id'.
+         */
+        std::vector<node_int> node_points_begin;
+    };
+
+    /**
+     * @brief Recurisvely called build fucntion.
+     * @warning This function iterates over [begin, end) (half-open interval).
+     */
+    template<typename T> node_int build_imp(qtree& tree, const aabb& bound, T begin, T end, size_t depth_limit){
+        // Tree is emtpy
+        if(begin == end){
+            return nil;
+        }
+
+        node_int return_me = tree.nodes.size();
+        tree.nodes.emplace_back();
+
+        if(begin + 1 == end){
+            return return_me;
+        }
+
+        // We constrain the depth as to avoid infinite recursion.
+        if(depth_limit == 0){
+            return return_me;
+        }
+
+        point mid = middle(bound.min, bound.max);
+        
+        // Partition the points along the y axis, whether or not they're smaller than the mid point.
+        T split_y = std::partition(begin, end, 
+            // We use a lambda function to capture the predicates.
+            [mid](const point& p){
+                return p.y < mid.y;
+        });
+
+        // Partition the points along the x axis, whether or not they're greater or less than the mid point and split_y.
+        T split_x_lower = std::partition(begin, split_y, 
+            // We use a lambda function to capture the predicates.
+            [mid](const point& p){
+                return p.x < mid.x;
+        });
+
+        // Partition the points along the x axis, whether or not they're greater or less than the mid point and split_y.
+        T split_x_upper = std::partition(split_y, end, 
+            // We use a lambda function to capture the predicates.
+            [mid](const point& p){
+                return p.x < mid.x;
+        });
+
+        // Compute the starting point index when building a node.
+        tree.node_points_begin[return_me] = (begin - tree.points.begin());
+
+        // Recursively compute the points we want to add to the quadrants we just created.
+        tree.nodes[return_me].children[0][0] = build_imp(tree, {bound.min, mid}, begin, split_x_lower, depth_limit - 1);
+        tree.nodes[return_me].children[0][1] = build_imp(tree, {{mid.x, bound.min.y}, {bound.max.x, mid.y}}, split_x_lower, split_y, depth_limit - 1);
+        tree.nodes[return_me].children[1][0] = build_imp(tree, {{bound.min.x, mid.y}, {mid.x, bound.max.y,}}, split_y, split_x_upper, depth_limit - 1);
+        tree.nodes[return_me].children[1][1] = build_imp(tree, {mid, bound.max}, split_x_upper, end, depth_limit - 1);
+
+        return return_me;
+    }
+
+    template<typename T> quadtree build(std::vector<point> points){
+        qtree return_me;
+        return_me.points = std::move(points);
+        return_me.root = build_imp(return_me, bound(return_me.points.begin, return_me.points.end), return_me.points.begin, return_me.points.end, 
+                                    config::MAX_QUADTREE_DEPTH);
+        return_me.node_points_begin.push_back(return_me.points.size());
+        return return_me;
+    }
+};
