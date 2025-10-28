@@ -9,8 +9,191 @@
 /**
  * @brief Implements the Quadtree used for improving the runtime of the FDL algorithm.
  */
-class QTree{
+class quadtree{
+    static constexpr int infty = std::numeric_limits<int>::infinity();
+    static constexpr node_int nil = node_int(-1);
     
+    // We store the points as integer x,y coordinates. This also means, that the canvas should ideally be a multiple of 2.
+    struct point{
+        int x,y;
+    };
+    
+    // The bounding box of a node.
+    struct aabb{
+        point min{infty, infty};
+        point max{-infty, -infty};
+        
+        aabb& operator |= (const point& p){
+            min.x = std::min(min.x, p.x);
+            min.y = std::min(min.y, p.y);
+            max.x = std::max(max.x, p.x);
+            max.y = std::max(max.y, p.y);
+            
+            return *this;
+        }
+    };
+    
+    point middle(const point a, const point b){
+        return {(a.x + b.x) / 2, (a.y + b.y) / 2};
+    }
+    
+    template<typename T>aabb bound(T begin, T end){
+        aabb return_me;
+        for(auto e = begin; e != end; e++){
+            return_me |= *e;
+        }
+
+        return return_me;
+    }
+
+    struct node{
+        node_int children[2][2]{
+            {nil, nil},
+            {nil, nil}
+        };
+    };
+
+    struct qtree{
+        aabb bound;
+        node_int root;
+        std::vector<node> nodes;
+        /**
+         * The "weight" or "mass" of each node, as in how much they should repel (and possibly
+         * also pull). If a node has more than one point then we take the sum of it's child's
+         * points.
+         */
+        std::vector<float> weight;
+        /**
+         * Acts as a "big node" we use for approximating a group of points stored in nodes we
+         * don't want to access. If the node only has one point then the center of mass will be
+         * set to that one point.
+         */
+        std::vector<point> center_of_mass;
+
+        std::vector<point> points;
+        /**
+         * Stores the per-node data. Here the points for 'id + 1' are stored directly after
+         * the points for 'id'.
+         */
+        std::vector<node_int> node_points_begin;
+    };
+
+    /**
+     * @brief Recurisvely called build function.
+     * @warning This function iterates over [begin, end) (half-open interval).
+     */
+    template<typename T> node_int build_imp(qtree& tree, const aabb& bound, T begin, T end, size_t depth_limit){
+        // Tree is emtpy
+        if(begin == end){
+            return nil;
+        }
+
+        node_int return_me = tree.nodes.size();
+        tree.nodes.emplace_back();
+
+        if(begin + 1 == end){
+            return return_me;
+        }
+
+        // We constrain the depth as to avoid infinite recursion.
+        if(depth_limit == 0){
+            return return_me;
+        }
+
+        point mid = middle(bound.min, bound.max);
+        
+        // Partition the points along the y axis, whether or not they're smaller than the mid point.
+        T split_y = std::partition(begin, end, 
+            // We use a lambda function to capture the predicates.
+            [mid](const point& p){
+                return p.y < mid.y;
+        });
+
+        // Partition the points along the x axis, whether or not they're greater or less than the mid point and split_y.
+        T split_x_lower = std::partition(begin, split_y, 
+            // We use a lambda function to capture the predicates.
+            [mid](const point& p){
+                return p.x < mid.x;
+        });
+
+        // Partition the points along the x axis, whether or not they're greater or less than the mid point and split_y.
+        T split_x_upper = std::partition(split_y, end, 
+            // We use a lambda function to capture the predicates.
+            [mid](const point& p){
+                return p.x < mid.x;
+        });
+
+        // Recursively compute the points we want to add to the quadrants we just created.
+        tree.nodes[return_me].children[0][0] = build_imp(tree, {bound.min, mid}, begin, split_x_lower, depth_limit - 1);
+        tree.nodes[return_me].children[0][1] = build_imp(tree, {{mid.x, bound.min.y}, {bound.max.x, mid.y}}, split_x_lower, split_y, depth_limit - 1);
+        tree.nodes[return_me].children[1][0] = build_imp(tree, {{bound.min.x, mid.y}, {mid.x, bound.max.y,}}, split_y, split_x_upper, depth_limit - 1);
+        tree.nodes[return_me].children[1][1] = build_imp(tree, {mid, bound.max}, split_x_upper, end, depth_limit - 1);
+        
+        // Compute the starting point index when building a node.
+        //! May cause problems -> Out of bounds access??
+        tree.node_points_begin[return_me] = (begin - tree.points.begin());
+        
+        return return_me;
+    }
+
+    /**
+     * @brief Calculates the weight for a given node recursively.
+     */
+    float calculate_weight_rec(node_int id, qtree tree){
+        // If the id is not a node, return 0.
+        if(id == nil){
+            return 0.0;
+        }
+
+        node_int ch00 = tree.nodes[id].children[0][0];
+        node_int ch01 = tree.nodes[id].children[0][1];
+        node_int ch10 = tree.nodes[id].children[1][0];
+        node_int ch11 = tree.nodes[id].children[1][1];
+        
+        // Check if node is a leaf.
+        if(ch00 == nil && ch01 == nil && ch10 == nil && ch11 == nil){
+            float sum_weight = 0.0;
+
+            // Iterate over all ids in the node and sum up their weight.
+            for(node_int i = tree.node_points_begin[id]; i < tree.node_points_begin[id + 1]; i++){
+                sum_weight += tree.weight[i];
+            }
+
+            return sum_weight;
+        }
+
+        tree.weight[id] = calculate_weight_rec(ch00, tree) 
+                        + calculate_weight_rec(ch01, tree) 
+                        + calculate_weight_rec(ch10, tree) 
+                        + calculate_weight_rec(ch11, tree);
+
+        return tree.weight[id];
+    }
+
+    point calculate_com_rec(node_int id, qtree tree){
+        return {nil,nil};
+    }
+
+    template<typename T> qtree build(std::vector<point> points, std::vector<float> weight){
+        qtree return_me;
+        return_me.points = std::move(points);
+        return_me.weight = std::move(weight);
+
+        return_me.node_points_begin.resize(return_me.points.size());
+        return_me.node_points_begin.push_back(return_me.points.size());
+        
+        return_me.root = build_imp(return_me, bound(return_me.points.begin(), return_me.points.end()), return_me.points.begin(), 
+                                    return_me.points.end(), config::MAX_QUADTREE_DEPTH);
+        
+
+        return_me.center_of_mass.resize(return_me.nodes.size());
+        return_me.weight.resize(return_me.nodes.size());
+
+        calculate_weight_rec(return_me.root, return_me);
+        calculate_com_rec(return_me.root, return_me);
+
+        return return_me;
+    }
 };
 
 /**
@@ -272,129 +455,3 @@ void fdl_run(std::string file_name, Graph* graph){
 
     return;
 }
-
-class quadtree{
-    static constexpr int infty = std::numeric_limits<int>::infinity();
-    static constexpr node_int nil = node_int(-1);
-    
-    // We store the points as integer x,y coordinates. This also means, that the canvas should ideally be a multiple of 2.
-    struct point{
-        int x,y;
-    };
-    
-    // The bounding box of a node.
-    struct aabb{
-        point min{infty, infty};
-        point max{-infty, -infty};
-        
-        aabb& operator |= (const point& p){
-            min.x = std::min(min.x, p.x);
-            min.y = std::min(min.y, p.y);
-            max.x = std::max(max.x, p.x);
-            max.y = std::max(max.y, p.y);
-            
-            return *this;
-        }
-    };
-    
-    point middle(const point a, const point b){
-        return {(a.x + b.x) / 2, (a.y + b.y) / 2};
-    }
-    
-    template<typename T>aabb bound(T begin, T end){
-        aabb return_me;
-        for(auto e = begin; e != end; e++){
-            return_me |= *e;
-        }
-
-        return return_me;
-    }
-
-    struct node{
-        node_int children[2][2]{
-            {nil, nil},
-            {nil, nil}
-        };
-    };
-
-    struct qtree{
-        aabb bound;
-        node_int root;
-        std::vector<node> nodes;
-        std::vector<float> mass;
-        std::vector<point> center_of_mass;
-
-        std::vector<point> points;
-        /**
-         * Stores the per-node data. Here the points for 'id + 1' are stored directly after
-         * the points for 'id'.
-         */
-        std::vector<node_int> node_points_begin;
-    };
-
-    /**
-     * @brief Recurisvely called build fucntion.
-     * @warning This function iterates over [begin, end) (half-open interval).
-     */
-    template<typename T> node_int build_imp(qtree& tree, const aabb& bound, T begin, T end, size_t depth_limit){
-        // Tree is emtpy
-        if(begin == end){
-            return nil;
-        }
-
-        node_int return_me = tree.nodes.size();
-        tree.nodes.emplace_back();
-
-        if(begin + 1 == end){
-            return return_me;
-        }
-
-        // We constrain the depth as to avoid infinite recursion.
-        if(depth_limit == 0){
-            return return_me;
-        }
-
-        point mid = middle(bound.min, bound.max);
-        
-        // Partition the points along the y axis, whether or not they're smaller than the mid point.
-        T split_y = std::partition(begin, end, 
-            // We use a lambda function to capture the predicates.
-            [mid](const point& p){
-                return p.y < mid.y;
-        });
-
-        // Partition the points along the x axis, whether or not they're greater or less than the mid point and split_y.
-        T split_x_lower = std::partition(begin, split_y, 
-            // We use a lambda function to capture the predicates.
-            [mid](const point& p){
-                return p.x < mid.x;
-        });
-
-        // Partition the points along the x axis, whether or not they're greater or less than the mid point and split_y.
-        T split_x_upper = std::partition(split_y, end, 
-            // We use a lambda function to capture the predicates.
-            [mid](const point& p){
-                return p.x < mid.x;
-        });
-
-        // Compute the starting point index when building a node.
-        tree.node_points_begin[return_me] = (begin - tree.points.begin());
-
-        // Recursively compute the points we want to add to the quadrants we just created.
-        tree.nodes[return_me].children[0][0] = build_imp(tree, {bound.min, mid}, begin, split_x_lower, depth_limit - 1);
-        tree.nodes[return_me].children[0][1] = build_imp(tree, {{mid.x, bound.min.y}, {bound.max.x, mid.y}}, split_x_lower, split_y, depth_limit - 1);
-        tree.nodes[return_me].children[1][0] = build_imp(tree, {{bound.min.x, mid.y}, {mid.x, bound.max.y,}}, split_y, split_x_upper, depth_limit - 1);
-        tree.nodes[return_me].children[1][1] = build_imp(tree, {mid, bound.max}, split_x_upper, end, depth_limit - 1);
-
-        return return_me;
-    }
-
-    template<typename T> quadtree build(std::vector<point> points){
-        qtree return_me;
-        return_me.points = std::move(points);
-        return_me.root = build_imp(return_me, bound(return_me.points.begin, return_me.points.end), return_me.points.begin, return_me.points.end, 
-                                    config::MAX_QUADTREE_DEPTH);
-        return_me.node_points_begin.push_back(return_me.points.size());
-        return return_me;
-    }
-};

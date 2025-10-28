@@ -1,3 +1,4 @@
+import sys
 import json
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -5,8 +6,14 @@ import matplotlib.patches as mpatches
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 
+if len(sys.argv) > 1:
+    json_path = sys.argv[1]
+else:
+    print("Error: no JSON path provided.\nUsage: python graph_explorer.py path/to/your.json", file=sys.stderr)
+    sys.exit(1)
+
 # Load your JSON
-with open("data/sparse_graph_with_communities1-fdl.json", "r") as f:
+with open(json_path, "r") as f:
     data = json.load(f)
 
 G = nx.Graph()
